@@ -1,57 +1,74 @@
 export const groups = {
   A: [
-    { name: "Brasil", flag: "🇧🇷" },
-    { name: "México", flag: "🇲🇽" },
-    { name: "Japão", flag: "🇯🇵" },
-    { name: "Nigéria", flag: "🇳🇬" },
+    { name: "México", code: "mx" },
+    { name: "África do Sul", code: "za" },
+    { name: "Coreia do Sul", code: "kr" },
+    { name: "Tchéquia", code: "cz" },
   ],
-
   B: [
-    { name: "Argentina", flag: "🇦🇷" },
-    { name: "Estados Unidos", flag: "🇺🇸" },
-    { name: "Marrocos", flag: "🇲🇦" },
-    { name: "Sérvia", flag: "🇷🇸" },
+    { name: "Canadá", code: "ca" },
+    { name: "Bósnia e Herzegovina", code: "ba" },
+    { name: "Catar", code: "qa" },
+    { name: "Suíça", code: "ch" },
   ],
-
   C: [
-    { name: "França", flag: "🇫🇷" },
-    { name: "Dinamarca", flag: "🇩🇰" },
-    { name: "Coreia do Sul", flag: "🇰🇷" },
-    { name: "Equador", flag: "🇪🇨" },
+    { name: "Brasil", code: "br" },
+    { name: "Marrocos", code: "ma" },
+    { name: "Haiti", code: "ht" },
+    { name: "Escócia", code: "gb-sct" },
   ],
-
   D: [
-    { name: "Alemanha", flag: "🇩🇪" },
-    { name: "Uruguai", flag: "🇺🇾" },
-    { name: "Canadá", flag: "🇨🇦" },
-    { name: "Gana", flag: "🇬🇭" },
+    { name: "Estados Unidos", code: "us" },
+    { name: "Paraguai", code: "py" },
+    { name: "Austrália", code: "au" },
+    { name: "Turquia", code: "tr" },
   ],
-
   E: [
-    { name: "Portugal", flag: "🇵🇹" },
-    { name: "Holanda", flag: "🇳🇱" },
-    { name: "Austrália", flag: "🇦🇺" },
-    { name: "Camarões", flag: "🇨🇲" },
+    { name: "Alemanha", code: "de" },
+    { name: "Curaçao", code: "cw" },
+    { name: "Costa do Marfim", code: "ci" },
+    { name: "Equador", code: "ec" },
   ],
-
   F: [
-    { name: "Espanha", flag: "🇪🇸" },
-    { name: "Croácia", flag: "🇭🇷" },
-    { name: "Egito", flag: "🇪🇬" },
-    { name: "Costa Rica", flag: "🇨🇷" },
+    { name: "Países Baixos", code: "nl" },
+    { name: "Japão", code: "jp" },
+    { name: "Suécia", code: "se" },
+    { name: "Tunísia", code: "tn" },
   ],
-
   G: [
-    { name: "Inglaterra", flag: "🏴" },
-    { name: "Bélgica", flag: "🇧🇪" },
-    { name: "Irã", flag: "🇮🇷" },
-    { name: "Paraguai", flag: "🇵🇾" },
+    { name: "Bélgica", code: "be" },
+    { name: "Egito", code: "eg" },
+    { name: "Irã", code: "ir" },
+    { name: "Nova Zelândia", code: "nz" },
   ],
-
   H: [
-    { name: "Itália", flag: "🇮🇹" },
-    { name: "Colômbia", flag: "🇨🇴" },
-    { name: "Suíça", flag: "🇨🇭" },
-    { name: "Senegal", flag: "🇸🇳" },
+    { name: "Espanha", code: "es" },
+    { name: "Cabo Verde", code: "cv" },
+    { name: "Arábia Saudita", code: "sa" },
+    { name: "Uruguai", code: "uy" },
+  ],
+  I: [
+    { name: "França", code: "fr" },
+    { name: "Senegal", code: "sn" },
+    { name: "Iraque", code: "iq" },
+    { name: "Noruega", code: "no" },
+  ],
+  J: [
+    { name: "Argentina", code: "ar" },
+    { name: "Argélia", code: "dz" },
+    { name: "Áustria", code: "at" },
+    { name: "Jordânia", code: "jo" },
+  ],
+  K: [
+    { name: "Portugal", code: "pt" },
+    { name: "RD Congo", code: "cd" },
+    { name: "Uzbequistão", code: "uz" },
+    { name: "Colômbia", code: "co" },
+  ],
+  L: [
+    { name: "Inglaterra", code: "gb-eng" },
+    { name: "Croácia", code: "hr" },
+    { name: "Gana", code: "gh" },
+    { name: "Panamá", code: "pa" },
   ],
 };

@@ -1,5 +1,6 @@
 import {
   Animated,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,6 +10,12 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 const groups = require("../data/groups.js").groups;
+
+type GroupSelection = {
+  first?: string;
+  second?: string;
+  third?: string;
+};
 
 type MatchResult = {
   score1: number;
@@ -23,13 +30,17 @@ type Match = {
 };
 
 export default function HomeScreen() {
-  const [selectedTeams, setSelectedTeams] = useState<Record<string, string[]>>({});
-  const [quarterFinalists, setQuarterFinalists] = useState<string[]>([]);
-  const [semiFinalists, setSemiFinalists] = useState<string[]>([]);
-  const [finalists, setFinalists] = useState<string[]>([]);
+  const [selectedTeams, setSelectedTeams] = useState<Record<string, GroupSelection>>({});
+  const [activeTeam, setActiveTeam] = useState("");
+
+  const [round32Winners, setRound32Winners] = useState<string[]>([]);
+  const [round16Winners, setRound16Winners] = useState<string[]>([]);
+  const [quarterWinners, setQuarterWinners] = useState<string[]>([]);
+  const [semiWinners, setSemiWinners] = useState<string[]>([]);
   const [champion, setChampion] = useState("");
 
-  const [roundOf16Results, setRoundOf16Results] = useState<Record<number, MatchResult>>({});
+  const [round32Results, setRound32Results] = useState<Record<number, MatchResult>>({});
+  const [round16Results, setRound16Results] = useState<Record<number, MatchResult>>({});
   const [quarterResults, setQuarterResults] = useState<Record<number, MatchResult>>({});
   const [semiResults, setSemiResults] = useState<Record<number, MatchResult>>({});
   const [finalResult, setFinalResult] = useState<MatchResult | null>(null);
@@ -44,23 +55,119 @@ export default function HomeScreen() {
     }).start();
   }, []);
 
-  function generateScoreForWinner(team1: string, team2: string, winner: string): MatchResult {
-    let winnerScore = Math.floor(Math.random() * 3) + 2;
-    let loserScore = Math.floor(Math.random() * winnerScore);
+  function clearKnockout() {
+    setRound32Winners([]);
+    setRound16Winners([]);
+    setQuarterWinners([]);
+    setSemiWinners([]);
+    setChampion("");
+    setRound32Results({});
+    setRound16Results({});
+    setQuarterResults({});
+    setSemiResults({});
+    setFinalResult(null);
+  }
 
-    if (winner === team1) {
-      return {
-        score1: winnerScore,
-        score2: loserScore,
-        winner,
+  function resetTournament() {
+    setSelectedTeams({});
+    setActiveTeam("");
+    clearKnockout();
+  }
+
+  function shuffleArray<T>(array: T[]) {
+    return [...array].sort(() => Math.random() - 0.5);
+  }
+
+  function randomizeGroups() {
+    clearKnockout();
+    setActiveTeam("");
+
+    const groupNames = Object.keys(groups);
+    const shuffledThirdGroups = shuffleArray(groupNames).slice(0, 8);
+    const newSelections: Record<string, GroupSelection> = {};
+
+    groupNames.forEach((groupName) => {
+      const groupTeams = groups[groupName] as any[];
+      const shuffledTeams = shuffleArray(groupTeams);
+
+      newSelections[groupName] = {
+        first: shuffledTeams[0].name,
+        second: shuffledTeams[1].name,
+        third: shuffledThirdGroups.includes(groupName)
+          ? shuffledTeams[2].name
+          : undefined,
       };
-    }
+    });
 
-    return {
-      score1: loserScore,
-      score2: winnerScore,
-      winner,
-    };
+    setSelectedTeams(newSelections);
+  }
+
+  function getPosition(selection: GroupSelection, team: string) {
+    if (selection.first === team) return "1º";
+    if (selection.second === team) return "2º";
+    if (selection.third === team) return "3º";
+    return "";
+  }
+
+  function getPositionStyle(position: string) {
+    if (position === "1º") return styles.firstBadge;
+    if (position === "2º") return styles.secondBadge;
+    if (position === "3º") return styles.thirdBadge;
+    return styles.emptyBadge;
+  }
+
+  function getMedal(position: string) {
+    if (position === "1º") return "🥇";
+    if (position === "2º") return "🥈";
+    if (position === "3º") return "🥉";
+    return "";
+  }
+
+  function selectGroupPosition(
+    groupName: string,
+    teamName: string,
+    position: "first" | "second" | "third" | "fourth"
+  ) {
+    clearKnockout();
+
+    setSelectedTeams((prev) => {
+      const current = prev[groupName] || {};
+
+      const updated: GroupSelection = {
+        first: current.first === teamName ? undefined : current.first,
+        second: current.second === teamName ? undefined : current.second,
+        third: current.third === teamName ? undefined : current.third,
+      };
+
+      if (position === "fourth") {
+        return { ...prev, [groupName]: updated };
+      }
+
+      if (position === "third") {
+        const currentThirdCount = Object.entries(prev).filter(
+          ([group, selection]) => group !== groupName && selection.third
+        ).length;
+
+        if (currentThirdCount >= 8 && current.third !== teamName) {
+          alert("Só é possível escolher 8 melhores terceiros colocados.");
+          return prev;
+        }
+      }
+
+      updated[position] = teamName;
+      return { ...prev, [groupName]: updated };
+    });
+
+    setActiveTeam("");
+  }
+
+  function generateScoreForWinner(team1: string, team2: string, winner: string): MatchResult {
+    const winnerScore = Math.floor(Math.random() * 3) + 2;
+    const loserScore = Math.floor(Math.random() * winnerScore);
+
+    if (winner === team1) return { score1: winnerScore, score2: loserScore, winner };
+
+    return { score1: loserScore, score2: winnerScore, winner };
   }
 
   function generateRandomMatch(team1: string, team2: string): MatchResult {
@@ -78,146 +185,136 @@ export default function HomeScreen() {
     };
   }
 
-  function resetKnockout() {
-    setQuarterFinalists([]);
-    setSemiFinalists([]);
-    setFinalists([]);
-    setChampion("");
-    setRoundOf16Results({});
-    setQuarterResults({});
-    setSemiResults({});
-    setFinalResult(null);
+  function updateWinnerArray(
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    index: number,
+    team: string,
+    limit: number
+  ) {
+    setter((prev) => {
+      const copy = [...prev];
+      copy[index] = team;
+      return copy.slice(0, limit);
+    });
   }
 
-  function resetTournament() {
-    setSelectedTeams({});
-    resetKnockout();
+  function countFilled(items: string[]) {
+    return items.filter(Boolean).length;
   }
 
-  function handleSelect(group: string, team: string) {
-    const current = selectedTeams[group] || [];
+  function makeMatches(teams: string[]): Match[] {
+    const matches: Match[] = [];
 
-    resetKnockout();
-
-    if (current.includes(team)) {
-      setSelectedTeams({
-        ...selectedTeams,
-        [group]: current.filter((t) => t !== team),
-      });
-      return;
-    }
-
-    if (current.length < 2) {
-      setSelectedTeams({
-        ...selectedTeams,
-        [group]: [...current, team],
+    for (let i = 0; i < teams.length / 2; i++) {
+      matches.push({
+        team1: teams[i],
+        team2: teams[teams.length - 1 - i],
       });
     }
+
+    return matches;
   }
 
-  function advanceToQuarters(index: number, team: string) {
-    setQuarterFinalists((prev) => {
-      const copy = [...prev];
-      copy[index] = team;
-      return copy.filter(Boolean).slice(0, 8);
-    });
-
-    setSemiFinalists([]);
-    setFinalists([]);
-    setChampion("");
-    setQuarterResults({});
-    setSemiResults({});
-    setFinalResult(null);
-  }
-
-  function advanceToSemis(index: number, team: string) {
-    setSemiFinalists((prev) => {
-      const copy = [...prev];
-      copy[index] = team;
-      return copy.filter(Boolean).slice(0, 4);
-    });
-
-    setFinalists([]);
-    setChampion("");
-    setSemiResults({});
-    setFinalResult(null);
-  }
-
-  function advanceToFinal(index: number, team: string) {
-    setFinalists((prev) => {
-      const copy = [...prev];
-      copy[index] = team;
-      return copy.filter(Boolean).slice(0, 2);
-    });
-
-    setChampion("");
-    setFinalResult(null);
-  }
-
-  function simulateRoundOf16(index: number, team1: string, team2: string) {
-    const result = generateRandomMatch(team1, team2);
-
-    setRoundOf16Results({
-      ...roundOf16Results,
-      [index]: result,
-    });
-
-    advanceToQuarters(index, result.winner);
-  }
-
-  function manualRoundOf16(index: number, team1: string, team2: string, winner: string) {
+  function manualRound32(index: number, team1: string, team2: string, winner: string) {
     const result = generateScoreForWinner(team1, team2, winner);
+    setRound32Results({ ...round32Results, [index]: result });
+    updateWinnerArray(setRound32Winners, index, winner, 16);
 
-    setRoundOf16Results({
-      ...roundOf16Results,
-      [index]: result,
-    });
-
-    advanceToQuarters(index, winner);
+    setRound16Winners([]);
+    setQuarterWinners([]);
+    setSemiWinners([]);
+    setChampion("");
+    setRound16Results({});
+    setQuarterResults({});
+    setSemiResults({});
+    setFinalResult(null);
   }
 
-  function simulateQuarter(index: number, team1: string, team2: string) {
+  function simulateRound32(index: number, team1: string, team2: string) {
     const result = generateRandomMatch(team1, team2);
+    setRound32Results({ ...round32Results, [index]: result });
+    updateWinnerArray(setRound32Winners, index, result.winner, 16);
 
-    setQuarterResults({
-      ...quarterResults,
-      [index]: result,
-    });
+    setRound16Winners([]);
+    setQuarterWinners([]);
+    setSemiWinners([]);
+    setChampion("");
+    setRound16Results({});
+    setQuarterResults({});
+    setSemiResults({});
+    setFinalResult(null);
+  }
 
-    advanceToSemis(index, result.winner);
+  function manualRound16(index: number, team1: string, team2: string, winner: string) {
+    const result = generateScoreForWinner(team1, team2, winner);
+    setRound16Results({ ...round16Results, [index]: result });
+    updateWinnerArray(setRound16Winners, index, winner, 8);
+
+    setQuarterWinners([]);
+    setSemiWinners([]);
+    setChampion("");
+    setQuarterResults({});
+    setSemiResults({});
+    setFinalResult(null);
+  }
+
+  function simulateRound16(index: number, team1: string, team2: string) {
+    const result = generateRandomMatch(team1, team2);
+    setRound16Results({ ...round16Results, [index]: result });
+    updateWinnerArray(setRound16Winners, index, result.winner, 8);
+
+    setQuarterWinners([]);
+    setSemiWinners([]);
+    setChampion("");
+    setQuarterResults({});
+    setSemiResults({});
+    setFinalResult(null);
   }
 
   function manualQuarter(index: number, team1: string, team2: string, winner: string) {
     const result = generateScoreForWinner(team1, team2, winner);
+    setQuarterResults({ ...quarterResults, [index]: result });
+    updateWinnerArray(setQuarterWinners, index, winner, 4);
 
-    setQuarterResults({
-      ...quarterResults,
-      [index]: result,
-    });
-
-    advanceToSemis(index, winner);
+    setSemiWinners([]);
+    setChampion("");
+    setSemiResults({});
+    setFinalResult(null);
   }
 
-  function simulateSemi(index: number, team1: string, team2: string) {
+  function simulateQuarter(index: number, team1: string, team2: string) {
     const result = generateRandomMatch(team1, team2);
+    setQuarterResults({ ...quarterResults, [index]: result });
+    updateWinnerArray(setQuarterWinners, index, result.winner, 4);
 
-    setSemiResults({
-      ...semiResults,
-      [index]: result,
-    });
-
-    advanceToFinal(index, result.winner);
+    setSemiWinners([]);
+    setChampion("");
+    setSemiResults({});
+    setFinalResult(null);
   }
 
   function manualSemi(index: number, team1: string, team2: string, winner: string) {
     const result = generateScoreForWinner(team1, team2, winner);
+    setSemiResults({ ...semiResults, [index]: result });
+    updateWinnerArray(setSemiWinners, index, winner, 2);
 
-    setSemiResults({
-      ...semiResults,
-      [index]: result,
-    });
+    setChampion("");
+    setFinalResult(null);
+  }
 
-    advanceToFinal(index, winner);
+  function simulateSemi(index: number, team1: string, team2: string) {
+    const result = generateRandomMatch(team1, team2);
+    setSemiResults({ ...semiResults, [index]: result });
+    updateWinnerArray(setSemiWinners, index, result.winner, 2);
+
+    setChampion("");
+    setFinalResult(null);
+  }
+
+  function manualFinal(team1: string, team2: string, winner: string) {
+    const result = generateScoreForWinner(team1, team2, winner);
+    setFinalResult(result);
+    setChampion(winner);
   }
 
   function simulateFinal(team1: string, team2: string) {
@@ -226,255 +323,285 @@ export default function HomeScreen() {
     setChampion(result.winner);
   }
 
-  function manualChampion(team1: string, team2: string, winner: string) {
-    const result = generateScoreForWinner(team1, team2, winner);
-    setFinalResult(result);
-    setChampion(winner);
-  }
+  const groupNames = Object.keys(groups);
 
-  const totalGroups = Object.keys(groups).length;
-  const completedGroups = Object.values(selectedTeams).filter(
-    (teams: any) => teams.length === 2
-  ).length;
+  const firstPlaced = groupNames
+    .map((group) => selectedTeams[group]?.first)
+    .filter(Boolean) as string[];
 
-  const groupsComplete = completedGroups === totalGroups;
+  const secondPlaced = groupNames
+    .map((group) => selectedTeams[group]?.second)
+    .filter(Boolean) as string[];
 
-  const knockoutMatches: Match[] = [
-    { team1: selectedTeams["A"]?.[0], team2: selectedTeams["B"]?.[1] },
-    { team1: selectedTeams["C"]?.[0], team2: selectedTeams["D"]?.[1] },
-    { team1: selectedTeams["E"]?.[0], team2: selectedTeams["F"]?.[1] },
-    { team1: selectedTeams["G"]?.[0], team2: selectedTeams["H"]?.[1] },
-    { team1: selectedTeams["B"]?.[0], team2: selectedTeams["A"]?.[1] },
-    { team1: selectedTeams["D"]?.[0], team2: selectedTeams["C"]?.[1] },
-    { team1: selectedTeams["F"]?.[0], team2: selectedTeams["E"]?.[1] },
-    { team1: selectedTeams["H"]?.[0], team2: selectedTeams["G"]?.[1] },
-  ].map((match, index) => ({
+  const thirdPlaced = groupNames
+    .map((group) => selectedTeams[group]?.third)
+    .filter(Boolean) as string[];
+
+  const topTwoComplete = firstPlaced.length === 12 && secondPlaced.length === 12;
+  const thirdComplete = thirdPlaced.length === 8;
+  const round32Ready = topTwoComplete && thirdComplete;
+
+  const qualifiedTeams = [...firstPlaced, ...secondPlaced, ...thirdPlaced];
+
+  const round32Matches = makeMatches(qualifiedTeams).map((match, index) => ({
     ...match,
-    result: roundOf16Results[index] || null,
+    result: round32Results[index] || null,
   }));
 
-  const quarterMatches: Match[] = [
-    { team1: quarterFinalists[0], team2: quarterFinalists[1] },
-    { team1: quarterFinalists[2], team2: quarterFinalists[3] },
-    { team1: quarterFinalists[4], team2: quarterFinalists[5] },
-    { team1: quarterFinalists[6], team2: quarterFinalists[7] },
-  ].map((match, index) => ({
+  const round16Matches = makeMatches(round32Winners).map((match, index) => ({
+    ...match,
+    result: round16Results[index] || null,
+  }));
+
+  const quarterMatches = makeMatches(round16Winners).map((match, index) => ({
     ...match,
     result: quarterResults[index] || null,
   }));
 
-  const semiMatches: Match[] = [
-    { team1: semiFinalists[0], team2: semiFinalists[1] },
-    { team1: semiFinalists[2], team2: semiFinalists[3] },
-  ].map((match, index) => ({
+  const semiMatches = makeMatches(quarterWinners).map((match, index) => ({
     ...match,
     result: semiResults[index] || null,
   }));
 
+  const finalMatch = {
+    team1: semiWinners[0],
+    team2: semiWinners[1],
+  };
+
+  function renderMatches(
+    title: string,
+    matches: Match[],
+    winners: string[],
+    manualFunction: (index: number, team1: string, team2: string, winner: string) => void,
+    randomFunction: (index: number, team1: string, team2: string) => void
+  ) {
+    return (
+      <>
+        <Text style={styles.resultTitle}>{title}</Text>
+
+        {matches.map((match, index) => (
+          <View key={index} style={styles.matchCard}>
+            <TouchableOpacity
+              style={[
+                styles.teamSelect,
+                winners[index] === match.team1 && styles.winnerSelected,
+              ]}
+              onPress={() =>
+                match.team1 &&
+                match.team2 &&
+                manualFunction(index, match.team1, match.team2, match.team1)
+              }
+            >
+              <Text style={styles.matchText}>{match.team1 || "?"}</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.score}>
+              {match.result ? `${match.result.score1} x ${match.result.score2}` : "VS"}
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.teamSelect,
+                winners[index] === match.team2 && styles.winnerSelected,
+              ]}
+              onPress={() =>
+                match.team1 &&
+                match.team2 &&
+                manualFunction(index, match.team1, match.team2, match.team2)
+              }
+            >
+              <Text style={styles.matchText}>{match.team2 || "?"}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.randomButton}
+              onPress={() =>
+                match.team1 &&
+                match.team2 &&
+                randomFunction(index, match.team1, match.team2)
+              }
+            >
+              <Text style={styles.randomText}>🎲 Simular Aleatório</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </>
+    );
+  }
+
   return (
     <Animated.ScrollView style={[styles.container, { opacity: fadeAnim }]}>
       <View style={styles.hero}>
-        <Text style={styles.header}>🏆 Copa do Mundo 2026</Text>
+        <Text style={styles.trophy}>🏆</Text>
+        <Text style={styles.header}>Copa do Mundo 2026</Text>
+
         <Text style={styles.subHeader}>
-          Escolha os classificados, simule confrontos e descubra o campeão.
+          Monte os grupos, escolha os classificados e simule o campeão.
         </Text>
 
-        <TouchableOpacity style={styles.resetButton} onPress={resetTournament}>
-          <Text style={styles.resetText}>🔄 Reiniciar Copa</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.heroButtons}>
+          <TouchableOpacity style={styles.randomGroupsButton} onPress={randomizeGroups}>
+            <Text style={styles.resetIcon}>🎲</Text>
+            <Text style={styles.resetText}>Sortear Grupos</Text>
+          </TouchableOpacity>
 
-      <View style={styles.progressBox}>
-        <Text style={styles.progressText}>
-          Grupos completos: {completedGroups}/{totalGroups}
-        </Text>
-
-        <Text style={styles.progressSub}>
-          Selecione 2 classificados em cada grupo.
-        </Text>
-      </View>
-
-      {Object.entries(groups).map(([groupName, teams]: [string, any]) => (
-        <View key={groupName} style={styles.card}>
-          <Text style={styles.title}>Grupo {groupName}</Text>
-
-          {teams.map((team: any, index: number) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.teamButton,
-                selectedTeams[groupName]?.includes(team.name) && styles.selected,
-              ]}
-              onPress={() => handleSelect(groupName, team.name)}
-            >
-              <Text style={styles.teamText}>
-                {team.flag} {team.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity style={styles.resetButton} onPress={resetTournament}>
+            <Text style={styles.resetIcon}>↻</Text>
+            <Text style={styles.resetText}>Nova Simulação</Text>
+          </TouchableOpacity>
         </View>
-      ))}
+      </View>
 
-      {groupsComplete && (
-        <>
-          <Text style={styles.resultTitle}>🏆 Oitavas de Final</Text>
+      {Object.entries(groups).map(([groupName, teams]: [string, any]) => {
+        const selection = selectedTeams[groupName] || {};
 
-          {knockoutMatches.map((match, index) => (
-            <View key={index} style={styles.matchCard}>
-              <TouchableOpacity
-                style={[
-                  styles.teamSelect,
-                  quarterFinalists[index] === match.team1 && styles.winnerSelected,
-                ]}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  manualRoundOf16(index, match.team1, match.team2, match.team1)
-                }
-              >
-                <Text style={styles.matchText}>{match.team1}</Text>
-              </TouchableOpacity>
+        const sortedTeams = [...teams].sort((a: any, b: any) => {
+          const getOrder = (teamName: string) => {
+            if (selection.first === teamName) return 1;
+            if (selection.second === teamName) return 2;
+            if (selection.third === teamName) return 3;
+            return 4;
+          };
 
-              <Text style={styles.score}>
-                {match.result ? `${match.result.score1} x ${match.result.score2}` : "VS"}
-              </Text>
+          return getOrder(a.name) - getOrder(b.name);
+        });
 
-              <TouchableOpacity
-                style={[
-                  styles.teamSelect,
-                  quarterFinalists[index] === match.team2 && styles.winnerSelected,
-                ]}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  manualRoundOf16(index, match.team1, match.team2, match.team2)
-                }
-              >
-                <Text style={styles.matchText}>{match.team2}</Text>
-              </TouchableOpacity>
+        return (
+          <View key={groupName} style={styles.card}>
+            <Text style={styles.title}>Grupo {groupName}</Text>
 
-              <TouchableOpacity
-                style={styles.randomButton}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  simulateRoundOf16(index, match.team1, match.team2)
-                }
-              >
-                <Text style={styles.randomText}>🎲 Simular Aleatório</Text>
-              </TouchableOpacity>
+            <View style={styles.groupTable}>
+              <View style={styles.tableHeader}>
+                <Text style={[styles.headerText, styles.posColumn]}>POS</Text>
+                <Text style={[styles.headerText, styles.teamColumn]}>SELEÇÃO</Text>
+              </View>
+
+              {sortedTeams.map((team: any, index: number) => {
+                const position = getPosition(selection, team.name);
+                const activeKey = `${groupName}-${team.name}`;
+                const isActive = activeTeam === activeKey;
+
+                return (
+                  <View key={team.name}>
+                    <TouchableOpacity
+                      style={[
+                        styles.teamRow,
+                        !position && index % 2 === 0 && styles.teamRowAlt,
+                        position === "1º" && styles.firstPlaceRow,
+                        position === "2º" && styles.secondPlaceRow,
+                        position === "3º" && styles.thirdPlaceRow,
+                        isActive && styles.activeRow,
+                      ]}
+                      onPress={() => setActiveTeam(isActive ? "" : activeKey)}
+                    >
+                      <View style={[styles.positionBadge, getPositionStyle(position)]}>
+                        <Text style={styles.positionBadgeText}>{position}</Text>
+                      </View>
+
+                      <View style={styles.teamInfo}>
+                        <Image
+                          source={{
+                            uri: `https://flagcdn.com/w40/${team.code}.png`,
+                          }}
+                          style={styles.flagImage}
+                        />
+
+                        <Text style={styles.teamName}>
+                          {team.name} {getMedal(position)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {isActive && (
+                      <View style={styles.choiceBox}>
+                        <Text style={styles.choiceTitle}>
+                          Definir posição de {team.name}
+                        </Text>
+
+                        <View style={styles.choiceRow}>
+                          <TouchableOpacity
+                            style={[styles.choiceButton, styles.firstChoice]}
+                            onPress={() =>
+                              selectGroupPosition(groupName, team.name, "first")
+                            }
+                          >
+                            <Text style={styles.choiceText}>1º</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.choiceButton, styles.secondChoice]}
+                            onPress={() =>
+                              selectGroupPosition(groupName, team.name, "second")
+                            }
+                          >
+                            <Text style={styles.choiceText}>2º</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.choiceButton, styles.thirdChoice]}
+                            onPress={() =>
+                              selectGroupPosition(groupName, team.name, "third")
+                            }
+                          >
+                            <Text style={styles.choiceText}>3º</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.choiceButton, styles.fourthChoice]}
+                            onPress={() =>
+                              selectGroupPosition(groupName, team.name, "fourth")
+                            }
+                          >
+                            <Text style={styles.choiceText}>Não classifica</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
-          ))}
-        </>
-      )}
+          </View>
+        );
+      })}
 
-      {quarterFinalists.length >= 8 && (
-        <>
-          <Text style={styles.resultTitle}>⚽ Quartas de Final</Text>
+      {round32Ready &&
+        renderMatches(
+          "⚔️ 16 avos de Final",
+          round32Matches,
+          round32Winners,
+          manualRound32,
+          simulateRound32
+        )}
 
-          {quarterMatches.map((match, index) => (
-            <View key={index} style={styles.matchCard}>
-              <TouchableOpacity
-                style={[
-                  styles.teamSelect,
-                  semiFinalists[index] === match.team1 && styles.winnerSelected,
-                ]}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  manualQuarter(index, match.team1, match.team2, match.team1)
-                }
-              >
-                <Text style={styles.matchText}>{match.team1}</Text>
-              </TouchableOpacity>
+      {countFilled(round32Winners) >= 16 &&
+        renderMatches(
+          "🏆 Oitavas de Final",
+          round16Matches,
+          round16Winners,
+          manualRound16,
+          simulateRound16
+        )}
 
-              <Text style={styles.score}>
-                {match.result ? `${match.result.score1} x ${match.result.score2}` : "VS"}
-              </Text>
+      {countFilled(round16Winners) >= 8 &&
+        renderMatches(
+          "⚽ Quartas de Final",
+          quarterMatches,
+          quarterWinners,
+          manualQuarter,
+          simulateQuarter
+        )}
 
-              <TouchableOpacity
-                style={[
-                  styles.teamSelect,
-                  semiFinalists[index] === match.team2 && styles.winnerSelected,
-                ]}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  manualQuarter(index, match.team1, match.team2, match.team2)
-                }
-              >
-                <Text style={styles.matchText}>{match.team2}</Text>
-              </TouchableOpacity>
+      {countFilled(quarterWinners) >= 4 &&
+        renderMatches(
+          "🔥 Semifinal",
+          semiMatches,
+          semiWinners,
+          manualSemi,
+          simulateSemi
+        )}
 
-              <TouchableOpacity
-                style={styles.randomButton}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  simulateQuarter(index, match.team1, match.team2)
-                }
-              >
-                <Text style={styles.randomText}>🎲 Simular Aleatório</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </>
-      )}
-
-      {semiFinalists.length >= 4 && (
-        <>
-          <Text style={styles.resultTitle}>🔥 Semifinal</Text>
-
-          {semiMatches.map((match, index) => (
-            <View key={index} style={styles.matchCard}>
-              <TouchableOpacity
-                style={[
-                  styles.teamSelect,
-                  finalists[index] === match.team1 && styles.winnerSelected,
-                ]}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  manualSemi(index, match.team1, match.team2, match.team1)
-                }
-              >
-                <Text style={styles.matchText}>{match.team1}</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.score}>
-                {match.result ? `${match.result.score1} x ${match.result.score2}` : "VS"}
-              </Text>
-
-              <TouchableOpacity
-                style={[
-                  styles.teamSelect,
-                  finalists[index] === match.team2 && styles.winnerSelected,
-                ]}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  manualSemi(index, match.team1, match.team2, match.team2)
-                }
-              >
-                <Text style={styles.matchText}>{match.team2}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.randomButton}
-                onPress={() =>
-                  match.team1 &&
-                  match.team2 &&
-                  simulateSemi(index, match.team1, match.team2)
-                }
-              >
-                <Text style={styles.randomText}>🎲 Simular Aleatório</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </>
-      )}
-
-      {finalists.length >= 2 && (
+      {countFilled(semiWinners) >= 2 && (
         <>
           <Text style={styles.resultTitle}>👑 Final</Text>
 
@@ -482,11 +609,15 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={[
                 styles.teamSelect,
-                champion === finalists[0] && styles.winnerSelected,
+                champion === finalMatch.team1 && styles.winnerSelected,
               ]}
-              onPress={() => manualChampion(finalists[0], finalists[1], finalists[0])}
+              onPress={() =>
+                finalMatch.team1 &&
+                finalMatch.team2 &&
+                manualFinal(finalMatch.team1, finalMatch.team2, finalMatch.team1)
+              }
             >
-              <Text style={styles.finalText}>{finalists[0]}</Text>
+              <Text style={styles.finalText}>{finalMatch.team1}</Text>
             </TouchableOpacity>
 
             <Text style={styles.finalScore}>
@@ -496,16 +627,24 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={[
                 styles.teamSelect,
-                champion === finalists[1] && styles.winnerSelected,
+                champion === finalMatch.team2 && styles.winnerSelected,
               ]}
-              onPress={() => manualChampion(finalists[0], finalists[1], finalists[1])}
+              onPress={() =>
+                finalMatch.team1 &&
+                finalMatch.team2 &&
+                manualFinal(finalMatch.team1, finalMatch.team2, finalMatch.team2)
+              }
             >
-              <Text style={styles.finalText}>{finalists[1]}</Text>
+              <Text style={styles.finalText}>{finalMatch.team2}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.randomButton}
-              onPress={() => simulateFinal(finalists[0], finalists[1])}
+              onPress={() =>
+                finalMatch.team1 &&
+                finalMatch.team2 &&
+                simulateFinal(finalMatch.team1, finalMatch.team2)
+              }
             >
               <Text style={styles.randomText}>🎲 Simular Campeão</Text>
             </TouchableOpacity>
@@ -515,9 +654,28 @@ export default function HomeScreen() {
 
       {champion !== "" && (
         <View style={styles.championBox}>
-          <Text style={styles.championTitle}>🏆 CAMPEÃO</Text>
+          <View style={styles.confettiRow}>
+            <Text style={styles.confetti}>🎉</Text>
+            <Text style={styles.confetti}>✨</Text>
+            <Text style={styles.confetti}>🎊</Text>
+            <Text style={styles.confetti}>⭐</Text>
+            <Text style={styles.confetti}>🎉</Text>
+          </View>
+
+          <Text style={styles.championTitle}>🏆 CAMPEÃO DO MUNDO</Text>
           <Text style={styles.championText}>{champion}</Text>
-          <Text style={styles.championSub}>Parabéns ao grande vencedor!</Text>
+
+          <Text style={styles.championSub}>
+            Uma campanha histórica até o título da Copa do Mundo 2026!
+          </Text>
+
+          <View style={styles.confettiRow}>
+            <Text style={styles.confetti}>🎊</Text>
+            <Text style={styles.confetti}>🏆</Text>
+            <Text style={styles.confetti}>✨</Text>
+            <Text style={styles.confetti}>🎉</Text>
+            <Text style={styles.confetti}>⭐</Text>
+          </View>
         </View>
       )}
     </Animated.ScrollView>
@@ -526,117 +684,279 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: "#000814",
-    paddingHorizontal: 18,
-  },
+  flex: 1,
+  backgroundColor: "#cfd6df",
+  paddingHorizontal: 18,
+},
 
   hero: {
-    marginTop: 50,
-    marginBottom: 25,
+    marginTop: 30,
+    marginBottom: 35,
     alignItems: "center",
+    paddingVertical: 38,
+    paddingHorizontal: 20,
+    backgroundColor: "#dde4ec",
+    borderRadius: 34,
+    borderWidth: 2,
+    borderColor: "#d5dbe3",
+  },
+
+  trophy: {
+    fontSize: 68,
+    marginBottom: 6,
   },
 
   header: {
-    color: "#ffffff",
-    fontSize: 44,
+    color: "#111827",
+    fontSize: 58,
     fontWeight: "900",
     textAlign: "center",
+    letterSpacing: 1,
   },
 
   subHeader: {
-    color: "#cbd5e1",
-    fontSize: 18,
-    marginTop: 10,
-    fontWeight: "600",
+    color: "#475569",
+    fontSize: 20,
+    marginTop: 12,
+    marginBottom: 24,
+    fontWeight: "700",
     textAlign: "center",
   },
 
+  heroButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 14,
+  },
+
+  randomGroupsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#16a34a",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "#166534",
+  },
+
   resetButton: {
-    backgroundColor: "#ef4444",
-    paddingVertical: 13,
-    paddingHorizontal: 24,
-    borderRadius: 18,
-    marginTop: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#dc2626",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "#991b1b",
+  },
+
+  resetIcon: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "900",
+    marginRight: 10,
   },
 
   resetText: {
     color: "#ffffff",
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: "900",
-  },
-
-  progressBox: {
-    backgroundColor: "#001d3d",
-    padding: 18,
-    borderRadius: 20,
-    marginBottom: 25,
-    borderWidth: 2,
-    borderColor: "#003566",
-    alignItems: "center",
-  },
-
-  progressText: {
-    color: "#ffd60a",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-
-  progressSub: {
-    color: "#cbd5e1",
-    fontSize: 16,
-    marginTop: 8,
-    textAlign: "center",
   },
 
   card: {
-    backgroundColor: "#001d3d",
-    padding: 22,
+    backgroundColor: "#dde4ec",
+    padding: 20,
     borderRadius: 28,
     marginBottom: 25,
     borderWidth: 2,
-    borderColor: "#003566",
+    borderColor: "#d5dbe3",
   },
 
   title: {
-    color: "#ffd60a",
+    color: "#111827",
     fontSize: 30,
     fontWeight: "900",
-    marginBottom: 20,
+    marginBottom: 18,
     textAlign: "center",
   },
 
-  teamButton: {
-    backgroundColor: "#003566",
-    paddingVertical: 18,
-    borderRadius: 18,
-    marginBottom: 14,
-    alignItems: "center",
+  groupTable: {
     borderWidth: 2,
-    borderColor: "#00509d",
+    borderColor: "#d5dbe3",
+    borderRadius: 18,
+    overflow: "hidden",
   },
 
-  selected: {
-    backgroundColor: "#38b000",
-    borderColor: "#ccff33",
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#111827",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
 
-  winnerSelected: {
-    backgroundColor: "#38b000",
-    borderColor: "#ffd60a",
-    borderWidth: 3,
-    transform: [{ scale: 1.03 }],
+  headerText: {
+    color: "#f8fafc",
+    fontSize: 13,
+    fontWeight: "900",
   },
 
-  teamText: {
+  posColumn: {
+    width: 70,
+    textAlign: "center",
+  },
+
+  teamColumn: {
+    flex: 1,
+    paddingLeft: 12,
+  },
+
+  teamRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#e5ebf2",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#d5dbe3",
+  },
+
+  teamRowAlt: {
+    backgroundColor: "#dbe2ea",
+  },
+
+  firstPlaceRow: {
+    backgroundColor: "#d9fbe7",
+  },
+
+  secondPlaceRow: {
+    backgroundColor: "#ddeaff",
+  },
+
+  thirdPlaceRow: {
+    backgroundColor: "#ffe8d1",
+  },
+
+  activeRow: {
+    backgroundColor: "#fff7cc",
+  },
+
+  positionBadge: {
+    width: 52,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
+
+  firstBadge: {
+    backgroundColor: "#16a34a",
+    borderColor: "#15803d",
+  },
+
+  secondBadge: {
+    backgroundColor: "#2563eb",
+    borderColor: "#1d4ed8",
+  },
+
+  thirdBadge: {
+    backgroundColor: "#f97316",
+    borderColor: "#ea580c",
+  },
+
+  emptyBadge: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+  },
+
+  positionBadgeText: {
     color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+
+  teamInfo: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 14,
+  },
+
+  flagImage: {
+    width: 34,
+    height: 23,
+    marginRight: 14,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+
+  teamName: {
+    color: "#111827",
     fontSize: 20,
-    fontWeight: "bold",
+    fontWeight: "900",
+  },
+
+  choiceBox: {
+    backgroundColor: "#dce4ec",
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#d5dbe3",
+  },
+
+  choiceTitle: {
+    color: "#334155",
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+
+  choiceRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  choiceButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    borderWidth: 2,
+  },
+
+  firstChoice: {
+    backgroundColor: "#16a34a",
+    borderColor: "#15803d",
+  },
+
+  secondChoice: {
+    backgroundColor: "#2563eb",
+    borderColor: "#1d4ed8",
+  },
+
+  thirdChoice: {
+    backgroundColor: "#f97316",
+    borderColor: "#ea580c",
+  },
+
+  fourthChoice: {
+    backgroundColor: "#64748b",
+    borderColor: "#475569",
+  },
+
+  choiceText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "900",
   },
 
   resultTitle: {
-    color: "#ffd60a",
-    fontSize: 34,
+    color: "#111827",
+    fontSize: 36,
     fontWeight: "900",
     marginTop: 40,
     marginBottom: 22,
@@ -644,104 +964,126 @@ const styles = StyleSheet.create({
   },
 
   matchCard: {
-    backgroundColor: "#001d3d",
+    backgroundColor: "#dde4ec",
     padding: 22,
     borderRadius: 25,
     marginBottom: 22,
     borderWidth: 2,
-    borderColor: "#003566",
+    borderColor: "#d5dbe3",
     alignItems: "center",
   },
 
   matchText: {
-    color: "#ffffff",
+    color: "#111827",
     fontSize: 24,
     fontWeight: "900",
   },
 
   score: {
-    color: "#ffd60a",
-    fontSize: 30,
+    color: "#16a34a",
+    fontSize: 32,
     marginVertical: 15,
     fontWeight: "900",
   },
 
   teamSelect: {
     width: "100%",
-    backgroundColor: "#003566",
+    backgroundColor: "#eef2f7",
     paddingVertical: 18,
     borderRadius: 18,
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#00509d",
+    borderColor: "#cbd5e1",
+  },
+
+  winnerSelected: {
+    backgroundColor: "#d9fbe7",
+    borderColor: "#16a34a",
+    borderWidth: 3,
+    transform: [{ scale: 1.03 }],
   },
 
   randomButton: {
-    backgroundColor: "#ffb703",
+    backgroundColor: "#facc15",
     marginTop: 18,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#ca8a04",
   },
 
   randomText: {
-    color: "#000",
+    color: "#111827",
     fontSize: 18,
     fontWeight: "900",
   },
 
   finalCard: {
-    backgroundColor: "#001d3d",
+    backgroundColor: "#dde4ec",
     padding: 30,
     borderRadius: 30,
     marginBottom: 30,
     borderWidth: 3,
-    borderColor: "#ffd60a",
+    borderColor: "#facc15",
     alignItems: "center",
   },
 
   finalText: {
-    color: "#ffffff",
+    color: "#111827",
     fontSize: 28,
     fontWeight: "900",
   },
 
   finalScore: {
-    color: "#ffd60a",
-    fontSize: 34,
+    color: "#16a34a",
+    fontSize: 36,
     fontWeight: "900",
     marginVertical: 18,
   },
 
   championBox: {
-    backgroundColor: "#38b000",
-    padding: 40,
-    borderRadius: 30,
-    marginTop: 50,
-    marginBottom: 80,
+    backgroundColor: "#16a34a",
+    padding: 48,
+    borderRadius: 36,
+    marginTop: 55,
+    marginBottom: 90,
     alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#ffd60a",
+    borderWidth: 6,
+    borderColor: "#facc15",
+  },
+
+  confettiRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginVertical: 12,
+    gap: 18,
+  },
+
+  confetti: {
+    fontSize: 36,
   },
 
   championTitle: {
-    color: "#ffd60a",
-    fontSize: 40,
+    color: "#facc15",
+    fontSize: 44,
     fontWeight: "900",
+    textAlign: "center",
   },
 
   championText: {
     color: "#ffffff",
-    fontSize: 50,
+    fontSize: 60,
     fontWeight: "900",
-    marginTop: 15,
+    marginTop: 18,
     textAlign: "center",
   },
 
   championSub: {
     color: "#dcfce7",
-    fontSize: 18,
-    marginTop: 10,
-    fontWeight: "700",
+    fontSize: 20,
+    marginTop: 14,
+    fontWeight: "800",
+    textAlign: "center",
   },
 });
